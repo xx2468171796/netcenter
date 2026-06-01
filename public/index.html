@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>服务器监控</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">服务器监控 <span class="host" id="host">—</span></div>
+    <div class="topbar-right">
+      <span class="uptime" id="uptime"></span>
+      <button class="btn-ghost" id="pw-btn" type="button">改密码</button>
+      <button class="btn-ghost" id="theme-btn" type="button">浅色</button>
+      <form method="POST" action="/logout" style="display:inline"><button class="btn-ghost">退出</button></form>
+    </div>
+  </header>
+
+  <main>
+    <!-- 概览卡片 -->
+    <section class="cards" id="cards">
+      <div class="card"><div class="card-t">CPU</div><div class="card-v" id="c-cpu">—</div><div class="card-sub" id="c-cpu-sub"></div></div>
+      <div class="card"><div class="card-t">内存</div><div class="card-v" id="c-mem">—</div><div class="card-sub" id="c-mem-sub"></div></div>
+      <div class="card"><div class="card-t">磁盘</div><div class="card-v" id="c-disk">—</div><div class="card-sub" id="c-disk-sub"></div></div>
+      <div class="card"><div class="card-t">网络速率</div><div class="card-io" id="c-net">—</div><div class="card-sub" id="c-net-sub"></div></div>
+      <div class="card"><div class="card-t">连接数</div><div class="card-v" id="c-conns">—</div><div class="card-sub">ESTABLISHED</div></div>
+      <div class="card"><div class="card-t">流量（进 / 出）</div><div class="card-io" id="c-traffic">—</div><div class="card-sub" id="c-traffic-sub"></div></div>
+    </section>
+
+    <!-- 实时图 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>实时监控</h2>
+        <div class="head-controls">
+          <span class="ctl-label">刷新</span>
+          <div class="rangebtns" id="refresh-rates">
+            <button data-ms="1000">1s</button>
+            <button data-ms="3000" class="active">3s</button>
+            <button data-ms="5000">5s</button>
+            <button data-ms="10000">10s</button>
+          </div>
+          <span class="ctl-sep"></span>
+          <div class="rangebtns" id="sys-ranges">
+            <button data-r="live" class="active">实时</button>
+            <button data-r="1h">1小时</button>
+            <button data-r="6h">6小时</button>
+            <button data-r="24h">24小时</button>
+            <button data-r="7d">7天</button>
+          </div>
+        </div>
+      </div>
+      <div class="charts-grid">
+        <div class="chart" id="chart-cpu"></div>
+        <div class="chart" id="chart-mem"></div>
+        <div class="chart" id="chart-net"></div>
+        <div class="chart" id="chart-diskio"></div>
+      </div>
+    </section>
+
+    <!-- 流量统计 (第二块) -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>流量统计 (进 / 出)</h2>
+        <div class="traffic-controls">
+          <select id="traffic-iface"></select>
+          <div class="rangebtns" id="traffic-ranges">
+            <button data-r="1d" class="active">近1天</button>
+            <button data-r="7d">近1周</button>
+            <button data-r="15d">近15天</button>
+            <button data-r="30d">近30天</button>
+            <button data-r="90d">近3月</button>
+            <button data-r="month">本月</button>
+            <button data-r="1y">近1年</button>
+            <button data-r="custom">自定义</button>
+          </div>
+        </div>
+      </div>
+      <div class="custom-range" id="custom-range" style="display:none">
+        <label>起 <input type="date" id="d-start" /></label>
+        <label>止 <input type="date" id="d-end" /></label>
+        <button id="apply-custom">查询</button>
+      </div>
+      <div class="traffic-total" id="traffic-total"></div>
+      <div class="chart tall" id="chart-traffic"></div>
+    </section>
+
+    <!-- 进程 TOP -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>进程 TOP</h2>
+        <div class="rangebtns" id="proc-sort">
+          <button data-s="cpu" class="active">按 CPU</button>
+          <button data-s="mem">按内存</button>
+        </div>
+      </div>
+      <table class="tbl" id="proc-tbl">
+        <thead><tr><th>PID</th><th>进程</th><th>CPU %</th><th>内存 %</th><th>内存 (RSS)</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- Docker / PM2 -->
+    <section class="panel">
+      <div class="panel-head"><h2>Docker 容器 / PM2 进程</h2></div>
+      <div class="svc-grid">
+        <div>
+          <h3 class="sub-h">Docker 容器</h3>
+          <table class="tbl" id="docker-tbl"><thead><tr><th>容器</th><th>状态</th><th>CPU %</th><th>内存</th></tr></thead><tbody></tbody></table>
+        </div>
+        <div>
+          <h3 class="sub-h">PM2 进程</h3>
+          <table class="tbl" id="pm2-tbl"><thead><tr><th>名称</th><th>状态</th><th>CPU %</th><th>内存</th><th>重启</th></tr></thead><tbody></tbody></table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 磁盘分区 -->
+    <section class="panel">
+      <div class="panel-head"><h2>磁盘分区</h2></div>
+      <div id="disks"></div>
+    </section>
+
+    <!-- 网络明细 -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>网络明细</h2>
+        <div class="head-controls">
+          <div class="rangebtns" id="nd-ranges">
+            <button data-r="boot" class="active">自开机</button>
+            <button data-r="1d">近1天</button>
+            <button data-r="7d">近1周</button>
+            <button data-r="30d">近30天</button>
+            <button data-r="month">本月</button>
+          </div>
+          <span class="muted" id="net-detail-note"></span>
+        </div>
+      </div>
+      <table class="tbl" id="iface-tbl">
+        <thead><tr><th>网卡</th><th>↓ 下行</th><th>↑ 上行</th><th id="nd-rx-h">累计接收</th><th id="nd-tx-h">累计发送</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+
+    <!-- 存储与清理 -->
+    <section class="panel">
+      <div class="panel-head"><h2>存储与清理</h2></div>
+      <div class="storage-info" id="storage-info">加载中…</div>
+      <div class="storage-actions">
+        <label class="ret-label">数据保留
+          <select id="retention-sel">
+            <option value="35">35 天</option>
+            <option value="60">60 天</option>
+            <option value="90">90 天</option>
+            <option value="365">1 年</option>
+            <option value="0">不自动清理</option>
+          </select>
+        </label>
+        <button id="cleanup-btn" type="button">立即清理(回收磁盘)</button>
+        <span class="muted" id="cleanup-msg"></span>
+      </div>
+    </section>
+  </main>
+
+  <!-- 首次使用初始化向导 -->
+  <div class="modal-mask" id="init-modal" style="display:none">
+    <div class="modal">
+      <h3>欢迎使用 · 初始化设置</h3>
+      <p class="muted" style="margin-top:-4px">选择采样数据的保留时长(之后可在「存储与清理」里随时改)</p>
+      <label>数据保留时长
+        <select id="init-retention">
+          <option value="35" selected>35 天(默认)</option>
+          <option value="60">60 天</option>
+          <option value="90">90 天</option>
+          <option value="365">1 年</option>
+          <option value="0">不自动清理(永久保留)</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button id="init-done" type="button">开始使用</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 修改密码弹窗 -->
+  <div class="modal-mask" id="pw-modal" style="display:none">
+    <div class="modal">
+      <h3>修改密码</h3>
+      <label>原密码<input type="password" id="pw-old" autocomplete="current-password" /></label>
+      <label>新密码<input type="password" id="pw-new" autocomplete="new-password" /></label>
+      <label>确认新密码<input type="password" id="pw-new2" autocomplete="new-password" /></label>
+      <div class="modal-msg" id="pw-msg"></div>
+      <div class="modal-actions">
+        <button class="btn-ghost" id="pw-cancel" type="button">取消</button>
+        <button id="pw-submit" type="button">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/echarts.min.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

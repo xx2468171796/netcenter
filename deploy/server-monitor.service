@@ -1,0 +1,15 @@
+[Unit]
+Description=Server Monitor (lightweight CPU/mem/disk/net + vnStat traffic dashboard)
+After=network.target vnstat.service
+
+[Service]
+Type=simple
+WorkingDirectory=__INSTALL_DIR__
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning __INSTALL_DIR__/server.js
+Restart=always
+RestartSec=3
+User=root
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target

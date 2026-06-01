@@ -1,0 +1,10 @@
+{
+  "port": 8055,
+  "host": "127.0.0.1",
+  "username": "admin",
+  "password": "改成你的强密码",
+  "primaryIface": "",
+  "sampleIntervalSec": 3,
+  "retentionDays": 35,
+  "dbPath": "./data/metrics.db"
+}

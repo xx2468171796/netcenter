@@ -1,0 +1,32 @@
+# 一键启动 (监控宿主机):  docker compose up -d
+# 默认拉公开镜像 ghcr.io/xx2468171796/netcenter; 想本地构建就把 image 注释、解开 build
+services:
+  netcenter:
+    image: ghcr.io/xx2468171796/netcenter:latest
+    # build: .
+    container_name: netcenter
+    restart: unless-stopped
+    # 监控宿主机必须: 共享宿主进程/网络命名空间
+    pid: host
+    network_mode: host
+    cap_add:
+      - SYS_PTRACE
+    environment:
+      # 容器内读宿主的 /proc 和根文件系统
+      - HOST_PROC=/host/proc
+      - HOST_ROOT=/host
+      - SM_PORT=8055               # 固定端口 (访问 http://机器IP:8055)
+      - SM_HOST=0.0.0.0            # 直接对外 (自带登录); 若挂反代可改 127.0.0.1
+      - SM_USER=admin
+      - SM_PASS=123456            # ⚠️ 默认密码, 登录后请在界面改
+      # - SM_IFACE=eth0           # 留空自动选物理网卡
+    volumes:
+      - /proc:/host/proc:ro
+      - /:/host:ro,rslave                              # 宿主磁盘分区
+      - /var/run/docker.sock:/var/run/docker.sock:ro   # Docker 容器监控
+      - netcenter-data:/app/data                       # 实时采样历史 (SQLite)
+      - netcenter-vnstat:/var/lib/vnstat               # 容器自带 vnStat 流量数据
+
+volumes:
+  netcenter-data:
+  netcenter-vnstat:
